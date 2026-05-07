@@ -27,7 +27,7 @@
   .row.stat-row { justify-content: space-between; }
   .row.edit-row { gap: 12px; }
   .row.add-row { justify-content: flex-start; cursor: pointer; }
-  .row.export-row { justify-content: flex-start; cursor: pointer; border-top: 0.5px solid #1a1a1a; margin-top: auto; border-bottom: none; }
+  .row.export-row { justify-content: flex-start; cursor: pointer; margin-top: auto; border-top: 0.5px solid #1a1a1a; border-bottom: none; }
 
   .nav-item { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #2a2a2a; cursor: pointer; user-select: none; }
   .nav-item.active { color: #fff; }
@@ -52,50 +52,24 @@
   .stat-val em { color: #444; font-style: normal; }
 
   .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; outline: none; padding: 0; min-width: 0; }
-  .edit-ok { font-size: 15px; color: #555; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; user-select: none; padding: 8px 0 8px 14px; flex-shrink: 0; }
+  .edit-ok { font-size: 15px; color: #555; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; user-select: none; padding: 8px 0 8px 10px; flex-shrink: 0; }
   .edit-ok:active { color: #fff; }
+  .edit-del { font-size: 15px; color: #3a1a1a; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; user-select: none; padding: 8px 0 8px 10px; flex-shrink: 0; }
+  .edit-del:active { color: #c00; }
 
   .home-bar { height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .home-indicator { width: 134px; height: 5px; background: #333; border-radius: 3px; }
 
-  /* Export card — hidden off screen, rendered by html2canvas */
   #export-card {
-    position: fixed;
-    left: -9999px;
-    top: 0;
-    width: 750px;
-    background: #000;
-    padding: 80px 60px 80px;
+    position: fixed; left: -9999px; top: 0; width: 750px;
+    background: #000; padding: 80px 60px;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   }
-  #export-card .ex-year {
-    font-size: 22px;
-    font-weight: 500;
-    color: #444;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 48px;
-  }
-  #export-card .ex-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 28px 0;
-    border-bottom: 0.5px solid #1a1a1a;
-  }
+  #export-card .ex-year { font-size: 22px; font-weight: 500; color: #444; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 48px; }
+  #export-card .ex-row { display: flex; justify-content: space-between; align-items: baseline; padding: 28px 0; border-bottom: 0.5px solid #1a1a1a; }
   #export-card .ex-row:last-child { border-bottom: none; }
-  #export-card .ex-name {
-    font-size: 48px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #fff;
-  }
-  #export-card .ex-val {
-    font-size: 28px;
-    font-weight: 600;
-    color: #888;
-    letter-spacing: 0.02em;
-  }
+  #export-card .ex-name { font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  #export-card .ex-val { font-size: 28px; font-weight: 600; color: #888; letter-spacing: 0.02em; }
   #export-card .ex-pct { color: #444; }
 </style>
 </head>
@@ -127,14 +101,14 @@
   <div class="home-bar"><div class="home-indicator"></div></div>
 </div>
 
-<!-- Off-screen card used for image export -->
 <div id="export-card"></div>
 
 <script>
-  const NAMES_KEY = 'activity_names_v2';
-  const LOG_KEY   = 'activity_log_v2';
+  const NAMES_KEY = 'activity_names_v3';
+  const LOG_KEY   = 'activity_log_v3';
   const DEFAULT_NAMES = ['Gym', 'Nights out', 'Family', 'Abroad', 'Reading'];
   const MAX_HABITS = 10;
+  const MIN_HABITS = 1;
 
   function todayStr() {
     const n = new Date();
@@ -166,12 +140,10 @@
   const today = todayStr();
 
   function ensureToday() {
-    if (!log[today] || log[today].length < habitNames.length) {
-      const existing = log[today] || [];
-      while (existing.length < habitNames.length) existing.push(false);
-      log[today] = existing;
-      saveLog();
-    }
+    const existing = log[today] || [];
+    while (existing.length < habitNames.length) existing.push(false);
+    log[today] = existing;
+    saveLog();
   }
   ensureToday();
 
@@ -181,17 +153,26 @@
     return Object.values(log).filter(e => Array.isArray(e) && e[idx] === true).length;
   }
 
+  function deleteActivity(i) {
+    if (habitNames.length <= MIN_HABITS) return;
+    if (!confirm('Delete "' + habitNames[i] + '"? All logged data for this activity will be lost.')) return;
+    habitNames.splice(i, 1);
+    Object.keys(log).forEach(k => { if (Array.isArray(log[k])) log[k].splice(i, 1); });
+    saveNames(); saveLog();
+    editingIdx = null;
+    renderActivity(); renderStats();
+  }
+
   function addActivity() {
     if (habitNames.length >= MAX_HABITS) return;
     habitNames.push('New activity');
     saveNames();
     Object.keys(log).forEach(k => {
-      while (log[k].length < habitNames.length) log[k].push(false);
+      if (Array.isArray(log[k])) log[k].push(false);
     });
     saveLog();
     editingIdx = habitNames.length - 1;
-    renderActivity();
-    renderStats();
+    renderActivity(); renderStats();
   }
 
   function renderActivity() {
@@ -204,6 +185,7 @@
       if (editingIdx === i) {
         const row = document.createElement('div');
         row.className = 'row edit-row';
+
         const inp = document.createElement('input');
         inp.className = 'edit-input';
         inp.value = name === 'New activity' ? '' : name;
@@ -211,25 +193,37 @@
         inp.setAttribute('autocomplete', 'off');
         inp.setAttribute('autocorrect', 'off');
         inp.setAttribute('autocapitalize', 'words');
-        const ok = document.createElement('span');
-        ok.className = 'edit-ok'; ok.textContent = 'OK';
+
         const confirm = () => {
           const v = inp.value.trim();
-          if (v) habitNames[i] = v;
-          else if (habitNames[i] === 'New activity') {
+          if (v) {
+            habitNames[i] = v;
+          } else if (name === 'New activity') {
             habitNames.splice(i, 1);
-            Object.keys(log).forEach(k => { if (log[k].length > i) log[k].splice(i, 1); });
+            Object.keys(log).forEach(k => { if (Array.isArray(log[k])) log[k].splice(i, 1); });
             saveLog();
           }
           saveNames(); editingIdx = null;
           renderActivity(); renderStats();
         };
-        ok.onclick = confirm;
+
         inp.onkeydown = e => {
           if (e.key === 'Enter') { inp.blur(); confirm(); }
           if (e.key === 'Escape') { editingIdx = null; renderActivity(); }
         };
-        row.appendChild(inp); row.appendChild(ok);
+
+        const ok = document.createElement('span');
+        ok.className = 'edit-ok'; ok.textContent = 'OK';
+        ok.onclick = confirm;
+
+        // Delete button — only if more than minimum
+        const del = document.createElement('span');
+        del.className = 'edit-del'; del.textContent = 'DEL';
+        del.onclick = () => deleteActivity(i);
+
+        row.appendChild(inp);
+        row.appendChild(ok);
+        if (habitNames.length > MIN_HABITS) row.appendChild(del);
         list.appendChild(row);
         setTimeout(() => { inp.focus(); inp.select(); }, 20);
         return;
@@ -288,25 +282,15 @@
     const elapsed = daysElapsed();
     const year = new Date().getFullYear();
     const card = document.getElementById('export-card');
-
     let html = '<div class="ex-year">' + year + '</div>';
     habitNames.forEach((name, i) => {
       const count = totalDays(i);
       const pct = Math.round((count / elapsed) * 100);
-      html += '<div class="ex-row">' +
-        '<span class="ex-name">' + name + '</span>' +
-        '<span class="ex-val">' + count + ' <span class="ex-pct">/ ' + pct + '%</span></span>' +
-        '</div>';
+      html += '<div class="ex-row"><span class="ex-name">' + name + '</span><span class="ex-val">' + count + ' <span class="ex-pct">/ ' + pct + '%</span></span></div>';
     });
     card.innerHTML = html;
-
     setTimeout(() => {
-      html2canvas(card, {
-        backgroundColor: '#000000',
-        scale: 2,
-        useCORS: true,
-        logging: false
-      }).then(canvas => {
+      html2canvas(card, { backgroundColor: '#000000', scale: 2, useCORS: true, logging: false }).then(canvas => {
         const link = document.createElement('a');
         link.download = 'activity-' + year + '.png';
         link.href = canvas.toDataURL('image/png');
@@ -335,10 +319,7 @@
   updateClock(); setInterval(updateClock, 15000);
 
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      ensureToday();
-      renderActivity(); renderStats(); updateClock();
-    }
+    if (!document.hidden) { ensureToday(); renderActivity(); renderStats(); updateClock(); }
   });
 
   renderActivity(); renderStats();
