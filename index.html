@@ -1,484 +1,3 @@
-
-Claude is responding
-You said: Quick question - can you help me develop tools for the Light Phone III through its newly created developer program?
-Quick question - can you help me develop tools for the Light Phone III through its newly created developer program?
-
-16:56
-Claude responded: Yes!
-
-Searched the web
-Searched the web
-Yes! This is a pretty exciting new development. Here's what's known so far:
-
-Light announced a developer program for the Light Phone III that will let people create tools for the minimalist device. In addition to providing an SDK, Light will also provide a platform for sharing and distributing tools. 
-Engadget
-
-Timeline
-
-SDK access arrives in June 2026, vetting of submitted tools begins in August or September, and the platform targets a user launch in October. So the SDK isn't publicly available quite yet. 
-Gadget Hacks
-
-What the SDK includes
-
-The SDK will allow developers to access push notifications and media like photos, videos, audio and other files on the device (with user permission). It also includes an open-source UI/UX library for building tools, and an emulator for testing without a physical Light Phone. 
-Engadget
-
-The rules for tools
-
-The program is non-commercial and open-source, every tool requires Light's explicit approval, and there is no open storefront. Anyone can build and submit; not everything gets in. Tools must serve a clear intentional purpose and respect user privacy. 
-Gadget Hacks
-
-How to get involved now
-
-Light is looking for interested developers and beta testers. You don't need to own a Light Phone to participate — they'll provide a lightweight LightOS emulator. You can fill out a form on their site to receive an invite to their community GitHub resources and forums. 
-The Light Phone
-
-So the practical next step is to sign up on lightphonethings.com and wait for the June SDK drop. In the meantime, I can definitely help you think through tool concepts, plan the UX within the LightOS aesthetic constraints, or get a head start on the underlying logic. What kind of tool are you thinking of building?
-
-You said: I want to make a version of the app that you helped me make for iOS
-I want to make a version of the app that you helped me make for iOS
-
-17:10
-Claude responded: I remember the PWA activity tracker you built — the one logging daily yes/no habits (gym, nights out, family evenings, time abroad, reading) with a calendar gr…
-I remember the PWA activity tracker you built — the one logging daily yes/no habits (gym, nights out, family evenings, time abroad, reading) with a calendar grid and Apple Watch-style concentric rings.
-
-Is that the one you mean? Just want to confirm before we start thinking about how to adapt it for the Light Phone III's constraints (black and white UI, React Native / LightOS, minimal interaction model, etc.).
-
-You said: Yes
-Yes
-
-17:10
-Claude responded: Great!
-Great! A few things to think through before we dive in, since the Light Phone III is a very different environment from a PWA:
-
-Key constraints to design around:
-
-Black and white only (white text on black background)
-Minimal, intentional UI — no flashy animations or complex layouts
-Built with their open-source UI/UX library (React Native based)
-Small screen, portrait-oriented
-No engagement-maximizing patterns allowed
-Questions about adapting the app:
-
-The concentric rings and calendar grid are very visual — they'll need rethinking for a monochrome, minimal aesthetic. And some of your tracked habits might need reconsideration for the Light ethos.
-
-A few things I'd like to clarify:
-
-You said: Q: The concentric rings visual won't translate well to monochrome — how should we handle the daily summary view?
-Q: The concentric rings visual won't translate well to monochrome — how should we handle the daily summary view?
-A: Let Claude suggest something fitting
-
-Q: Do you want to keep all 5 habits (gym, nights out, family evenings, time abroad, reading)?
-A: Yes, keep all 5
-
-17:11
-Claude responded: Since the SDK isn't out yet, I'll build this as a faithful prototype using React Native-style thinking but delivered as an artifact — so you have something con…
-Since the SDK isn't out yet, I'll build this as a faithful prototype using React Native-style thinking but delivered as an artifact — so you have something concrete to work from when the SDK drops in June.
-
-For the daily summary, I'm thinking a vertical stack of labeled rows with a minimal filled/empty square indicator (■ / □) — clean, intentional, very Light Phone. Plus a simple weekly streak view using the calendar grid in monochrome.
-
-
-
-Here's a prototype of what it could look like on the Light Phone III. You can tap the habit rows to toggle them on/off, and switch between "Today" and "History" views.
-
-Key design decisions I made to fit the Light Phone ethos:
-
-■ / □ squares instead of rings — monochrome, intentional, no color needed
-Dot row in the corner shows your week at a glance without being distracting
-Calendar view uses filled/half-filled/empty cells to encode how many habits you hit that day
-Weekly bar chart replaces the rings as the "how am I doing" overview
-Everything in a monospaced font to match LightOS's aesthetic
-Once the SDK drops in June, the main work will be porting this to React Native using their UI/UX library. Want to refine anything — the layout, the habits list, the history view?
-
-You said: Maybe use the same screen size as the LPIII has to visualize this?
-Maybe use the same screen size as the LPIII has to visualize this?
-
-17:12
-Claude responded: The LP III has a 1080×1240 display — nearly square, and quite small at 3.
-
-Searched the web
-Searched the web
-The LP III has a 1080×1240 display — nearly square, and quite small at 3.92". I'll scale it proportionally so it renders accurately here.
-
-
-
-There it is — the screen is now sized to the actual 1080×1240 ratio, which comes out nearly square and quite compact. I've also added the side buttons and fingerprint sensor to give a better sense of how the UI fits within the physical device.
-
-The nearly-square screen is quite different from a typical phone — it actually works nicely for this app since the habit list and calendar grid both benefit from the extra width. Want to tweak anything?
-
-You said: I would like for there to be two clickable links/pages at the top, one that is called Activity and the other called Stats.
-I would like for there to be two clickable links/pages at the top, one that is called Activity and the other called Stats. Under Activity you can click on one of these five things mentioned, but only once every 24 hours. After clicking it is greyed out. The other page, Stats, will show you how many days you have done each relevant activity, as in number of times, and then there is a slash sign and following that a percentage, showing you the percentage of how many days, compared to the calendar year - say if you have worked out 8 times in the first ten days of the year, it would show 80%.
-
-Show more
-17:33
-Claude responded: Here's the updated version.
-
-
-Here's the updated version. A few notes on how it works:
-
-Activity tab — tap any item to log it. It immediately greys out and can't be tapped again (the 24-hour lock will be enforced by storing the date alongside each entry in the real SDK implementation)
-Stats tab — shows each habit's total days logged, then the percentage relative to how far through the year you are (day 127 of 2026 right now, so the denominator updates daily automatically)
-The seed data simulates a realistic history going back to January 1st so the stats are meaningful to look at
-Want to adjust anything — the layout, the formatting of the stats, or how the percentage is calculated?
-
-You said: If you click an activity again in the 24h window, then you undo the click.
-If you click an activity again in the 24h window, then you undo the click. Add that functionality.
-
-17:35
-Claude responded: Done — clicking a logged activity now toggles it back off, and the stats update instantly to reflect the change.
-
-
-Done — clicking a logged activity now toggles it back off, and the stats update instantly to reflect the change. The 24-hour window logic stays intact: in the real SDK implementation, each entry will be stamped with the date, so undoing is only possible within the same calendar day.
-
-Anything else to adjust?
-
-You said: Can you make it so that it is possible to rename each of the five categories?
-Can you make it so that it is possible to rename each of the five categories? I want to limit it only five categories - then it fits nicely into the look and lines of the LPIII
-
-17:38
-Claude responded: Renaming is now live.
-
-
-Renaming is now live. Tap the small ✎ icon next to any category name to edit it inline — type the new name and hit "ok" or press Enter to confirm, or Escape to cancel. The updated name carries over instantly to the Stats tab too.
-
-The log data is stored by index (0–4) rather than by name, so renaming a category preserves all its historical data. Want any other changes?
-
-You said: have a look at how the LPIII actually looks to better emulate the look.
-have a look at how the LPIII actually looks to better emulate the look. On the LPIII's menu there are only six lines of text. Have a look at that and adjust the look accordingly. the top line would be the Activity / Stats pages, the next five lines the relevant activities.
-
-17:41
-Claude responded: Good — I can see the LightOS aesthetic clearly now.
-
-Searched the web
-Searched the web
-Light Phone III minimalist phone with 3.92″ OLED screen announced
-
-fonearena.com
-Light Phone 3 Launches With OLED Display, Much Higher Price Tag ...
-
-lowyat.net
-Light Phone 3 launches with 50% discount, monochrome OLED and ...
-
-notebookcheck.net
-4
-Results from the web
-Good — I can see the LightOS aesthetic clearly now. The UI is defined by large, bold, widely-spaced text items on a pure black background, left-aligned, with generous line height. Each item is essentially a full-width text row with a lot of breathing room. There's a small status bar at the top and a very minimal back/navigation element. No borders between rows, no icons — just clean, large type with lots of negative space.
-
-
-
-Much closer to the real LightOS now — large bold sans-serif type, pure black background, generous row height, minimal separators, and the Activity / Stats navigation sits as the top line just like the tool name header in LightOS.
-
-Interaction model:
-
-Tap a row to toggle it logged/unlogged
-Hold (long press, ~0.6s) to rename that category inline
-Stats update live as you toggle
-Anything else to refine?
-
-You said: The top line, with Activity and Stats, they should be the same lettering as the other lines and better spaced within that top line.
-The top line, with Activity and Stats, they should be the same lettering as the other lines and better spaced within that top line.
-
-17:44
-Claude responded: The top line now matches the five activity rows exactly — same font size, weight, and row height.
-
-
-The top line now matches the five activity rows exactly — same font size, weight, and row height. Activity and Stats sit evenly spaced with a "/" between them, the active one in white and the inactive one dimmed, just like how LightOS handles selected vs unselected items. All six lines are now visually consistent. How does that feel?
-
-You said: Leave that / out of it and just keep them right and left sided.
-Leave that / out of it and just keep them right and left sided.
-
-17:46
-Claude responded: Done — "Activity" sits on the left, "Stats" on the right, no separator, active one in white and inactive dimmed.
-
-
-Done — "Activity" sits on the left, "Stats" on the right, no separator, active one in white and inactive dimmed. Clean and consistent with the rows below. How's that looking?
-
-You said: There is no need for the box around the menu names.
-There is no need for the box around the menu names. And keep the size, font and weight of the letters the same as the five below.
-
-17:47
-Claude responded: Clean now — no box, no border, no background on the nav.
-
-
-Clean now — no box, no border, no background on the nav. Just plain text, same size, weight and feel as the five rows below. Active page in white, inactive dimmed. All six lines are visually identical in treatment. How does that look?
-
-You said: The activity and the stats text looks smaller.
-The activity and the stats text looks smaller. Keep it looking the same as the other text.
-
-17:49
-Claude responded: The browser is overriding the button font size with its own default styles.
-The browser is overriding the button font size with its own default styles. Let me render those as plain span elements instead.
-
-
-
-Switched from <button> elements to plain <span> elements so the browser's default button styling can't interfere — all six lines should now be identical in size and weight. Does that match up now?
-
-You said: This is perfect.
-This is perfect.
-
-17:50
-Claude responded: Glad it landed right!
-Glad it landed right! When the SDK drops in June you'll have a solid blueprint to port this to Jetpack Compose. The core logic is already clean — index-based storage, daily toggle with undo, long-press rename, and the stats calculation all translate naturally to a proper LightOS tool.
-
-Want to save this as a file in the meantime, or move on to thinking about anything else for the app?
-
-You said: Save it as a file in the meantime.
-Save it as a file in the meantime.
-
-17:51
-Claude responded: There you go.
-
-Ran a command, read a file
-Ran a command, read a file
-There you go. One small note — in the file version I switched todayStr() to use the real current date rather than the hardcoded demo date, so it'll work correctly as an actual day-to-day tracker. Data persists in localStorage between sessions.
-
-
-Lp3 activity tracker
-Code · HTML 
-You said: Can you make me the same app, exactly the same look, for iOS?
-Can you make me the same app, exactly the same look, for iOS?
-
-18:30
-Claude responded: For iOS I'll build this as a proper PWA — the same self-contained HTML file, but styled to sit at the actual iPhone screen dimensions and feel native on iOS (s…
-For iOS I'll build this as a proper PWA — the same self-contained HTML file, but styled to sit at the actual iPhone screen dimensions and feel native on iOS (status bar, home indicator, safe areas). Which iPhone do you primarily use, so I get the screen size right?
-
-You said: Q: Which iPhone do you use?
-Q: Which iPhone do you use?
-A: iPhone 17 Pro Max
-
-18:30
-Claude responded: Good choice — I'll size it for the 17 Pro Max (same dimensions as the 16 Pro Max: 430×932pt logical resolution, large dynamic island, 34pt home indicator).
-Good choice — I'll size it for the 17 Pro Max (same dimensions as the 16 Pro Max: 430×932pt logical resolution, large dynamic island, 34pt home indicator). Same look as the LP3 version — black background, big bold text, six rows.
-
-
-Viewed a file, ran a command, read a file
-Viewed a file, ran a command, read a file
-Here it is. To install it on your iPhone as a proper home screen app:
-
-Open the file in Safari (you can AirDrop it to yourself or host it anywhere)
-Tap the share button → "Add to Home Screen"
-It'll run full screen with the status bar styled black, safe areas respected, and the home indicator at the bottom
-The behaviour is identical to the LP3 version — tap to toggle, hold to rename, data persists in localStorage. It also auto-resets for a new day if you open it after midnight.
-
-
-Lp3 activity tracker ios
-Code · HTML 
-You said: I can't get it to work.
-I can't get it to work.
-
-18:42
-Claude responded: Can you tell me a bit more about what's happening?
-Can you tell me a bit more about what's happening? For example:
-
-Are you trying to open it in Safari on your iPhone, or somewhere else?
-Does it show a blank screen, an error, or something else entirely?
-You said: I can't get it to open in Safari
-I can't get it to open in Safari
-
-18:43
-Claude responded: The easiest way is to AirDrop it directly to your iPhone.
-The easiest way is to AirDrop it directly to your iPhone. On your Mac:
-
-Find the downloaded file lp3_activity_tracker_ios.html
-Right-click it → Share → AirDrop → select your iPhone
-On your iPhone, tap Accept — it should open straight in Safari
-If you don't have a Mac nearby, you can also get it onto your phone by emailing it to yourself and opening the attachment in Safari, or saving it to iCloud Drive and opening it from the Files app.
-
-Which of those works best for you?
-
-You said: I can't open it with Safari from the files app on my iphone
-I can't open it with Safari from the files app on my iphone
-
-18:43
-Claude responded: That's a known Safari limitation — it blocks local HTML files opened from the Files app for security reasons.
-That's a known Safari limitation — it blocks local HTML files opened from the Files app for security reasons. The simplest workaround is to host it for free in about 2 minutes:
-
-Go to netlify.com/drop on your computer
-Drag and drop the lp3_activity_tracker_ios.html file onto the page
-Netlify gives you a live URL instantly — open that URL on your iPhone in Safari
-Then tap Share → Add to Home Screen to install it
-That's genuinely the fastest path. Want me to tweak anything in the file itself while you're setting that up?
-
-You said: Will this remain online for good?
-Will this remain online for good?
-
-18:46
-Claude responded: Not guaranteed — Netlify Drop sites are technically temporary and can expire.
-Not guaranteed — Netlify Drop sites are technically temporary and can expire. For something permanent, the better options are:
-
-Free and reliable long-term:
-
-GitHub Pages — free, permanent, takes about 5 minutes to set up. You'd create a free GitHub account, upload the file to a repository, and enable Pages. It gives you a stable URL like yourusername.github.io/activity
-Cloudflare Pages — same idea, also free and very stable
-Simplest of all — no hosting needed:
-
-I can convert the app into a proper iOS shortcut or look at another approach entirely. Actually, the cleanest solution for a single HTML file on iPhone is to paste the code directly into an app called Scriptable — it's free on the App Store and runs JavaScript/HTML locally on your phone with no internet needed.
-Would you like me to adapt the file for Scriptable? That way it lives entirely on your phone, no hosting, no expiry.
-
-You said: Yes, do that.
-Yes, do that. Also, the stats in the app have to start counting from Day 1 of the calendar year - not from the day it is installed, or opened.
-
-18:47
-Claude responded: Good catch on the stats — I'll make sure day 1 of the year is always the denominator, regardless of when you first install it.
-Good catch on the stats — I'll make sure day 1 of the year is always the denominator, regardless of when you first install it. Let me adapt it for Scriptable.
-
-
-Ran a command, read a file
-Ran a command, read a file
-Here it is. To get it running:
-
-Download Scriptable free from the App Store
-Open Scriptable → tap + to create a new script
-Select all the default text and delete it
-Copy everything from the downloaded .js file and paste it in
-Tap the play ▶ button to run it — it opens full screen
-To make it feel like a proper app, you can add it to your home screen: in Scriptable, long-press the script → Share → Add to Home Screen.
-
-The stats percentage is calculated from January 1st of the current year regardless of when you install it, and all data is saved locally on your phone in Scriptable's own file storage — no internet needed, no expiry.
-
-
-Lp3 activity tracker scriptable
-JS 
-You said: So the script closes when I click on any activity.
-So the script closes when I click on any activity.
-
-18:50
-Claude responded: That's the persist() function — I used a URL scheme trick to save data that ends up closing the view.
-That's the persist() function — I used a URL scheme trick to save data that ends up closing the view. Let me fix it to save data properly through Scriptable's file system instead, so the view stays open the whole time.
-
-
-Ran a command, read a file
-Ran a command, read a file
-The fix: instead of navigating to a URL (which closed the view), the app now writes changes to sessionStorage inside the web view, and a background loop in Scriptable polls that every 2 seconds and saves to the local file system. The view stays open the whole time.
-
-Replace your existing script with this new version — delete everything in it and paste this in fresh. Let me know if it behaves now!
-
-
-Lp3 activity tracker scriptable
-JS 
-You said: Works now, but the stats window says 1/1% after I click it when the percentage should be 1 divided by the number of days that have passed this year.
-Works now, but the stats window says 1/1% after I click it when the percentage should be 1 divided by the number of days that have passed this year.
-
-18:53
-Claude responded: The bug is in daysElapsed() — it's calculating from today's date as a string that gets evaluated at load time, but the date math is off by one.
-The bug is in daysElapsed() — it's calculating from today's date as a string that gets evaluated at load time, but the date math is off by one. Let me fix it to correctly count days from January 1st to today.
-
-
-Ran a command, read a file
-Ran a command, read a file
-The fix: daysElapsed is now calculated once in Scriptable itself — where the date maths is reliable — and injected into the web view as a plain number rather than being recalculated inside the browser. So today, May 7th, it will correctly show 127 as the denominator. Replace the script with this version and it should show the right percentage.
-
-
-Lp3 activity tracker scriptable
-JS 
-You said: Still says 1%
-Still says 1%
-
-18:55
-Claude responded: Let me add some debug output so we can see exactly what numbers are being calculated.
-Let me add some debug output so we can see exactly what numbers are being calculated.
-
-
-Ran a command, read a file
-Ran a command, read a file
-Paste this small debug script into a new Scriptable script and run it — it'll show a popup with exactly what date values Scriptable is calculating. Share what it says and I can pinpoint exactly where it's going wrong.
-
-
-Lp3 debug
-JS 
-You said: I don't like this.
-I don't like this. I will set up on Github instead. Can you prepare the file for me so that it will work on there?
-
-19:22
-Claude responded: The file is named index.
-
-Ran a command, read a file
-Ran a command, read a file
-The file is named index.html which is what GitHub Pages expects. To get it live:
-
-Go to github.com and create a free account if you don't have one
-Click + → New repository — name it anything, e.g. activity
-Make it Public
-Upload the index.html file
-Go to Settings → Pages → under Source select main branch → Save
-Your URL will be https://yourusername.github.io/activity
-Open that URL in Safari on your iPhone, then tap Share → Add to Home Screen and it installs as a proper full-screen app. Data saves in localStorage so it persists between sessions — and since it's running in a real browser, daysElapsed() will calculate correctly.
-
-
-Index
-Code · HTML 
-You said: I accidentally made it private, how do i change it?
-I accidentally made it private, how do i change it?
-
-19:30
-Claude responded: In your repository on GitHub:
-In your repository on GitHub:
-
-Go to Settings (tab at the top of the repo)
-Scroll all the way down to the Danger Zone section
-Click Change visibility → Change to public
-Type the repository name to confirm and click the button
-GitHub Pages only works on public repositories on free accounts, so this will also unblock the Pages deployment.
-
-You said: This works perfectly - except I can't rename the activities in the web app.
-This works perfectly - except I can't rename the activities in the web app.
-
-19:37
-Claude responded: The long-press to rename works fine with a mouse on desktop, but on iPhone Safari the touch events don't reliably distinguish a long press from a scroll.
-The long-press to rename works fine with a mouse on desktop, but on iPhone Safari the touch events don't reliably distinguish a long press from a scroll. Let me add a dedicated rename button instead — small and unobtrusive, same style as the rest of the UI.
-
-
-Ran a command, read a file
-Ran a command, read a file
-Each row now has a small dimmed "edit" label between the name and the checkbox. Tap it to rename that activity, tap OK or press return to confirm. Upload this to replace the existing index.html in your GitHub repo and it should update within a minute or two.
-
-
-Index
-Code · HTML 
-You said: I would rather have the pencil icon you usd first.
-I would rather have the pencil icon you usd first. And please also add the ability to add more activities, up to a total of ten.
-
-19:38
-Claude responded: Here's what changed:
-
-Ran a command, read a file
-Ran a command, read a file
-Here's what changed:
-
-✎ pencil icon on each row — tap it to rename that activity
-+ Add activity appears as the last row whenever you have fewer than 10 — tapping it adds a new one and immediately opens the rename field
-If you add one but leave the name blank, it removes itself cleanly
-All historical log data is preserved when you add new activities
-Upload this to replace index.html in your GitHub repo.
-
-
-Index
-Code · HTML 
-You said: How do I upload it and replace the old one?
-How do I upload it and replace the old one?
-
-19:45
-Claude responded: In your GitHub repository:
-In your GitHub repository:
-
-Click on the existing index.html file
-Click the pencil icon (Edit this file) in the top right of the file view
-Select all the text and delete it
-Open the new index.html file on your computer, select all, copy, and paste it in
-Scroll down and click Commit changes
-GitHub Pages will update within a minute or two. Just refresh the URL on your iPhone and it'll be live.
-
-You said: How do I open it to see the code?
-How do I open it to see the code?
-
-19:45
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-Index · HTML
-Copy
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -499,7 +18,7 @@ Copy
   .content { flex: 1; display: flex; flex-direction: column; padding: 0 var(--side-pad); overflow: hidden; }
   .view { display: none; flex-direction: column; flex: 1; }
   .view.active { display: flex; }
- 
+
   .row { display: flex; align-items: center; height: var(--row-height); border-bottom: 0.5px solid #1a1a1a; flex-shrink: 0; }
   .row:last-child { border-bottom: none; }
   .row.nav-row { justify-content: space-between; border-color: #1c1c1c; }
@@ -507,31 +26,31 @@ Copy
   .row.stat-row { justify-content: space-between; }
   .row.edit-row { gap: 12px; }
   .row.add-row { justify-content: flex-start; cursor: pointer; }
- 
+
   .nav-item { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #2a2a2a; cursor: pointer; user-select: none; }
   .nav-item.active { color: #fff; }
- 
+
   .row-label { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; }
   .habit-row.done .row-label { color: #2a2a2a; }
   .habit-row:not(.done) .row-label { color: #fff; }
- 
+
   .pencil { font-size: 16px; color: #2a2a2a; cursor: pointer; user-select: none; padding: 10px 0 10px 14px; flex-shrink: 0; line-height: 1; }
   .pencil:active { color: #888; }
- 
+
   .habit-tick { font-size: 18px; flex-shrink: 0; margin-left: 10px; cursor: pointer; }
   .habit-row.done .habit-tick { color: #2a2a2a; }
   .habit-row:not(.done) .habit-tick { color: #1e1e1e; }
- 
+
   .add-label { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #222; user-select: none; }
- 
+
   .stat-row .row-label { max-width: 55%; color: #fff; cursor: default; }
   .stat-val { font-size: 18px; font-weight: 600; color: #888; white-space: nowrap; letter-spacing: 0.01em; }
   .stat-val em { color: #444; font-style: normal; }
- 
+
   .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; outline: none; padding: 0; min-width: 0; }
   .edit-ok { font-size: 15px; color: #555; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; user-select: none; padding: 8px 0 8px 14px; flex-shrink: 0; }
   .edit-ok:active { color: #fff; }
- 
+
   .home-bar { height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .home-indicator { width: 134px; height: 5px; background: #333; border-radius: 3px; }
 </style>
@@ -560,42 +79,42 @@ Copy
   </div>
   <div class="home-bar"><div class="home-indicator"></div></div>
 </div>
- 
+
 <script>
   const NAMES_KEY = 'activity_names_v2';
   const LOG_KEY   = 'activity_log_v2';
   const DEFAULT_NAMES = ['Gym', 'Nights out', 'Family', 'Abroad', 'Reading'];
   const MAX_HABITS = 10;
- 
+
   function todayStr() {
     const n = new Date();
     return n.getFullYear() + '-' +
       String(n.getMonth() + 1).padStart(2, '0') + '-' +
       String(n.getDate()).padStart(2, '0');
   }
- 
+
   function daysElapsed() {
     const n = new Date();
     const jan1 = new Date(n.getFullYear(), 0, 1);
     return Math.floor((n - jan1) / 86400000) + 1;
   }
- 
+
   function loadNames() {
     try { const r = localStorage.getItem(NAMES_KEY); if (r) return JSON.parse(r); } catch(e) {}
     return [...DEFAULT_NAMES];
   }
   function saveNames() { try { localStorage.setItem(NAMES_KEY, JSON.stringify(habitNames)); } catch(e) {} }
- 
+
   function loadLog() {
     try { const r = localStorage.getItem(LOG_KEY); if (r) return JSON.parse(r); } catch(e) {}
     return {};
   }
   function saveLog() { try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch(e) {} }
- 
+
   let habitNames = loadNames();
   let log = loadLog();
   const today = todayStr();
- 
+
   function ensureToday() {
     if (!log[today] || log[today].length < habitNames.length) {
       const existing = log[today] || [];
@@ -605,13 +124,13 @@ Copy
     }
   }
   ensureToday();
- 
+
   let editingIdx = null;
- 
+
   function totalDays(idx) {
     return Object.values(log).filter(e => Array.isArray(e) && e[idx] === true).length;
   }
- 
+
   function addActivity() {
     if (habitNames.length >= MAX_HABITS) return;
     habitNames.push('New activity');
@@ -626,13 +145,13 @@ Copy
     renderActivity();
     renderStats();
   }
- 
+
   function renderActivity() {
     ensureToday();
     const entry = log[today];
     const list = document.getElementById('act-list');
     list.innerHTML = '';
- 
+
     habitNames.forEach((name, i) => {
       if (editingIdx === i) {
         const row = document.createElement('div');
@@ -668,11 +187,11 @@ Copy
         setTimeout(() => { inp.focus(); inp.select(); }, 20);
         return;
       }
- 
+
       const done = entry[i] || false;
       const row = document.createElement('div');
       row.className = 'row habit-row' + (done ? ' done' : '');
- 
+
       const label = document.createElement('span');
       label.className = 'row-label';
       label.textContent = name;
@@ -680,7 +199,7 @@ Copy
         log[today][i] = !log[today][i];
         saveLog(); renderActivity(); renderStats();
       };
- 
+
       const pencil = document.createElement('span');
       pencil.className = 'pencil';
       pencil.textContent = '✎';
@@ -689,7 +208,7 @@ Copy
         editingIdx = i;
         renderActivity();
       };
- 
+
       const tick = document.createElement('span');
       tick.className = 'habit-tick';
       tick.textContent = done ? '■' : '□';
@@ -697,13 +216,13 @@ Copy
         log[today][i] = !log[today][i];
         saveLog(); renderActivity(); renderStats();
       };
- 
+
       row.appendChild(label);
       row.appendChild(pencil);
       row.appendChild(tick);
       list.appendChild(row);
     });
- 
+
     // Add row — only shown if under the limit
     if (habitNames.length < MAX_HABITS) {
       const addRow = document.createElement('div');
@@ -716,7 +235,7 @@ Copy
       list.appendChild(addRow);
     }
   }
- 
+
   function renderStats() {
     const elapsed = daysElapsed();
     const list = document.getElementById('stat-list');
@@ -730,7 +249,7 @@ Copy
       list.appendChild(row);
     });
   }
- 
+
   function switchTab(tab) {
     document.getElementById('v-activity').classList.toggle('active', tab === 'activity');
     document.getElementById('v-stats').classList.toggle('active', tab === 'stats');
@@ -741,23 +260,22 @@ Copy
       );
     });
   }
- 
+
   function updateClock() {
     const n = new Date();
     document.getElementById('clk').textContent =
       n.getHours() + ':' + n.getMinutes().toString().padStart(2, '0');
   }
   updateClock(); setInterval(updateClock, 15000);
- 
+
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       ensureToday();
       renderActivity(); renderStats(); updateClock();
     }
   });
- 
+
   renderActivity(); renderStats();
 </script>
 </body>
 </html>
- 
