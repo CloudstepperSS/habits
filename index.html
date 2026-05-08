@@ -395,8 +395,10 @@
 
   function daysSinceJoined() {
     if (!joinedDate) return 1;
-    const start = new Date(joinedDate);
-    const now = new Date(todayStr());
+    const [sy, sm, sd] = joinedDate.split("-").map(Number);
+    const [ny, nm, nd] = todayStr().split("-").map(Number);
+    const start = new Date(sy, sm - 1, sd);
+    const now = new Date(ny, nm - 1, nd);
     return Math.max(1, Math.floor((now - start) / 86400000) + 1);
   }
 
