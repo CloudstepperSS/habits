@@ -159,6 +159,536 @@
 
   function updateDate() {
     const n = new Date();
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const todayFormatted = n.getDate() + " " + months[n.getMonth()];
+    let text = todayFormatted;
+    if (joinedDate) {
+      const [sy, sm, sd] = joinedDate.split("-").map(Number);
+      const startFormatted = sd + " " + months[sm - 1];
+      text = startFormatted + " / " + todayFormatted;
+    }
+    document.getElementById("top-date").textContent = text;
+  }
+  updateDate();
+  updateDate();
+
+  // ── Hashing ───────────────────────────────────────────────────────
+
+  async function hashPin(pin) {
+    const data = new TextEncoder().encode(pin);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // ── Supabase helpers ──────────────────────────────────────────────
+
+  async function sbGet(username) {
+    const res = await fetch(SUPA_URL + '/rest/v1/users?username=eq.' + encodeURIComponent(username) + '&select=*', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+    });
+    const rows = await res.json();
+    return rows[0] || null;
+  }
+
+  async function sbInsert(username, hashedPin) {
+    const joined = todayStr();
+    const res = await fetch(SUPA_URL + '/rest/v1/users', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type': 'application/json', 'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ username, pin: hashedPin, habit_names: DEFAULT_NAMES, log: {}, joined_date: joined })
+    });
+    const rows = await res.json();
+    return rows[0] || null;
+  }
+
+  async function sbUpdate(username, data) {
+    await fetch(SUPA_URL + '/rest/v1/users?username=eq.' + encodeURIComponent(username), {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+  }
+
+  // ── Push notifications ────────────────────────────────────────────
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return new Uint8Array([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+  async function updateNotifLabel() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      document.getElementById('notif-row').style.display = 'none';
+      return;
+    }
+    const perm = Notification.permission;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    const el = document.getElementById('notif-label');
+    if (perm === 'denied') {
+      el.textContent = 'Notifications blocked';
+      document.getElementById('notif-row').style.pointerEvents = 'none';
+    } else if (sub) {
+      el.textContent = 'Disable notifications';
+    } else {
+      el.textContent = 'Enable notifications';
+    }
+  }
+
+  async function toggleNotifications() {
+    if (!('serviceWorker' in navigator)) {
+      alert('Notifications are not supported. Make sure you have added this app to your home screen.');
+      return;
+    }
+
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      alert('Please add this app to your home screen first, then enable notifications.');
+      return;
+    }
+
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      // Unsubscribe
+      await existing.unsubscribe();
+      await fetch(SUPA_URL + '/rest/v1/push_subscriptions?username=eq.' + encodeURIComponent(currentUser), {
+        method: 'DELETE',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+      });
+      await updateNotifLabel();
+      return;
+    }
+
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      alert('Permission denied. You can enable notifications in your device settings.');
+      return;
+    }
+
+    try {
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+      });
+
+      // UTC offset in minutes (positive = ahead of UTC, negative = behind)
+      const utcOffset = -new Date().getTimezoneOffset();
+
+      await fetch(SUPA_URL + '/rest/v1/push_subscriptions', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: currentUser,
+          subscription: sub.toJSON(),
+          utc_offset: utcOffset
+        })
+      });
+
+      await updateNotifLabel();
+    } catch(e) {
+      alert('Could not enable notifications: ' + e.message);
+    }
+  }
+
+  // ── Session ───────────────────────────────────────────────────────
+
+  function saveSession(username, hashedPin) {
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify({ username, hashedPin })); } catch(e) {}
+  }
+  function clearSession() {
+    try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+  }
+  function loadSession() {
+    try { const r = localStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : null; } catch(e) { return null; }
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────
+
+  function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'register' : 'login';
+    document.getElementById('auth-title').textContent = authMode === 'login' ? 'Sign in' : 'Register';
+    document.getElementById('auth-submit-btn').textContent = 'Continue →';
+    document.getElementById('auth-switch-btn').textContent = authMode === 'login' ? 'No account? Register' : 'Have an account? Sign in';
+    document.getElementById('auth-error').textContent = '';
+  }
+
+  async function authSubmit() {
+    const username = document.getElementById('auth-username').value.trim();
+    const pin = document.getElementById('auth-pin').value.trim();
+    const errEl = document.getElementById('auth-error');
+    const btn = document.getElementById('auth-submit-btn');
+    errEl.textContent = '';
+
+    if (!username) { errEl.textContent = 'Please enter a username.'; return; }
+    if (!pin || pin.length < 4) { errEl.textContent = 'PIN must be at least 4 digits.'; return; }
+
+    btn.innerHTML = 'Continue <span class="spinner"></span>';
+    const hashedPin = await hashPin(pin);
+
+    if (authMode === 'register') {
+      const existing = await sbGet(username);
+      if (existing) { errEl.textContent = 'That username is taken.'; btn.textContent = 'Continue →'; return; }
+      const user = await sbInsert(username, hashedPin);
+      if (!user) { errEl.textContent = 'Registration failed. Try again.'; btn.textContent = 'Continue →'; return; }
+      saveSession(username, hashedPin);
+      loginAs(user);
+    } else {
+      const user = await sbGet(username);
+      if (!user) { errEl.textContent = 'User not found.'; btn.textContent = 'Continue →'; return; }
+      if (user.pin !== hashedPin) { errEl.textContent = 'Incorrect PIN.'; btn.textContent = 'Continue →'; return; }
+      saveSession(username, hashedPin);
+      loginAs(user);
+    }
+  }
+
+  function loginAs(user) {
+    currentUser = user.username;
+    habitNames = user.habit_names || [...DEFAULT_NAMES];
+    log = user.log || {};
+    joinedDate = user.joined_date || todayStr();
+    ensureToday();
+    document.getElementById('v-auth').classList.remove('active');
+    document.getElementById('v-auth').style.display = 'none';
+    const mc = document.getElementById('main-content');
+    mc.style.display = 'flex';
+    document.getElementById('v-activity').classList.add('active');
+    document.getElementById('v-stats').classList.remove('active');
+    updateNotifLabel();
+    updateDate();
+    renderActivity();
+    renderStats();
+  }
+
+  function logout() {
+    clearSession();
+    currentUser = null; habitNames = []; log = {}; joinedDate = null;
+    document.getElementById('main-content').style.display = 'none';
+    document.getElementById('v-auth').style.display = '';
+    document.getElementById('v-auth').classList.add('active');
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-pin').value = '';
+    document.getElementById('auth-error').textContent = '';
+    document.getElementById('auth-submit-btn').textContent = 'Continue →';
+  }
+
+  async function tryAutoLogin() {
+    const session = loadSession();
+    if (!session) return;
+    const user = await sbGet(session.username);
+    if (user && user.pin === session.hashedPin) {
+      loginAs(user);
+    } else {
+      clearSession();
+    }
+  }
+
+  // ── Data helpers ──────────────────────────────────────────────────
+
+  function todayStr() {
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  }
+
+  function daysSinceJoined() {
+    if (!joinedDate) return 1;
+    const [sy, sm, sd] = joinedDate.split("-").map(Number);
+    const [ny, nm, nd] = todayStr().split("-").map(Number);
+    const start = new Date(sy, sm - 1, sd);
+    const now = new Date(ny, nm - 1, nd);
+    return Math.max(1, Math.floor((now - start) / 86400000) + 1);
+  }
+
+  function ensureToday() {
+    const t = todayStr();
+    const e = log[t] || [];
+    while (e.length < habitNames.length) e.push(false);
+    log[t] = e;
+  }
+
+  function totalDays(idx) {
+    return Object.values(log).filter(e => Array.isArray(e) && e[idx] === true).length;
+  }
+
+  async function persist() {
+    if (!currentUser) return;
+    await sbUpdate(currentUser, { habit_names: habitNames, log: log });
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────
+
+  function addActivity() {
+    if (habitNames.length >= MAX_HABITS) return;
+    habitNames.push('New activity');
+    Object.keys(log).forEach(k => { if (Array.isArray(log[k])) log[k].push(false); });
+    editingIdx = habitNames.length - 1;
+    persist(); renderActivity(); renderStats();
+  }
+
+  function deleteActivity(i) {
+    if (habitNames.length <= MIN_HABITS) return;
+    if (!confirm('Delete "' + habitNames[i] + '"? All data for this activity will be lost.')) return;
+    habitNames.splice(i, 1);
+    Object.keys(log).forEach(k => { if (Array.isArray(log[k])) log[k].splice(i, 1); });
+    editingIdx = null;
+    persist(); renderActivity(); renderStats();
+  }
+
+  function renderActivity() {
+    ensureToday();
+    const entry = log[todayStr()];
+    const list = document.getElementById('act-list');
+    list.innerHTML = '';
+
+    habitNames.forEach((name, i) => {
+      if (editingIdx === i) {
+        const row = document.createElement('div'); row.className = 'row edit-row';
+        const inp = document.createElement('input'); inp.className = 'edit-input';
+        inp.value = name === 'New activity' ? '' : name; inp.maxLength = 16;
+        inp.setAttribute('autocomplete','off'); inp.setAttribute('autocorrect','off'); inp.setAttribute('autocapitalize','words');
+        const confirm = () => {
+          const v = inp.value.trim();
+          if (v) habitNames[i] = v;
+          else if (name === 'New activity') {
+            habitNames.splice(i, 1);
+            Object.keys(log).forEach(k => { if (Array.isArray(log[k])) log[k].splice(i, 1); });
+          }
+          editingIdx = null; persist(); renderActivity(); renderStats();
+        };
+        inp.onkeydown = e => { if (e.key==='Enter') { inp.blur(); confirm(); } if (e.key==='Escape') { editingIdx=null; renderActivity(); } };
+        const ok = document.createElement('span'); ok.className='edit-ok'; ok.textContent='OK'; ok.onclick=confirm;
+        const del = document.createElement('span'); del.className='edit-del'; del.textContent='DEL'; del.onclick=()=>deleteActivity(i);
+        row.appendChild(inp); row.appendChild(ok);
+        if (habitNames.length > MIN_HABITS) row.appendChild(del);
+        list.appendChild(row);
+        setTimeout(()=>{ inp.focus(); inp.select(); }, 20);
+        return;
+      }
+
+      const done = entry[i] || false;
+      const row = document.createElement('div');
+      row.className = 'row habit-row' + (done ? ' done' : '');
+
+      const label = document.createElement('span'); label.className='row-label'; label.textContent=name;
+      label.onclick = () => { log[todayStr()][i]=!log[todayStr()][i]; persist(); renderActivity(); renderStats(); };
+
+      const pencil = document.createElement('span'); pencil.className='pencil'; pencil.textContent='✎';
+      pencil.onclick = e => { e.stopPropagation(); editingIdx=i; renderActivity(); };
+
+      const tick = document.createElement('span'); tick.className='habit-tick'; tick.textContent=done?'■':'□';
+      tick.onclick = () => { log[todayStr()][i]=!log[todayStr()][i]; persist(); renderActivity(); renderStats(); };
+
+      row.appendChild(label); row.appendChild(pencil); row.appendChild(tick);
+      list.appendChild(row);
+    });
+
+    if (habitNames.length < MAX_HABITS) {
+      const addRow = document.createElement('div'); addRow.className='row add-row'; addRow.onclick=addActivity;
+      const addLabel = document.createElement('span'); addLabel.className='muted-label'; addLabel.textContent='+ Add activity';
+      addRow.appendChild(addLabel); list.appendChild(addRow);
+    }
+  }
+
+  function renderStats() {
+    const elapsed = daysSinceJoined();
+    const list = document.getElementById('stat-list');
+    list.innerHTML = '';
+    habitNames.forEach((name, i) => {
+      const count = totalDays(i);
+      const pct = Math.round((count / elapsed) * 100);
+      const row = document.createElement('div'); row.className='row stat-row';
+      row.innerHTML = '<span class="row-label">'+name+'</span><span class="stat-val">'+count+' <em>/ '+pct+'%</em></span>';
+      list.appendChild(row);
+    });
+  }
+
+  function exportStats() {
+    const elapsed = daysSinceJoined();
+    const year = new Date().getFullYear();
+    const card = document.getElementById('export-card');
+    let html = '<div class="ex-year">'+currentUser+' · '+year+'</div>';
+    habitNames.forEach((name, i) => {
+      const count = totalDays(i);
+      const pct = Math.round((count / elapsed) * 100);
+      html += '<div class="ex-row"><span class="ex-name">'+name+'</span><span class="ex-val">'+count+' <span class="ex-pct">/ '+pct+'%</span></span></div>';
+    });
+    card.innerHTML = html;
+    setTimeout(() => {
+      html2canvas(card, { backgroundColor:'#000000', scale:2, useCORS:true, logging:false }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'activity-'+currentUser+'-'+year+'.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        card.innerHTML = '';
+      });
+    }, 100);
+  }
+
+  function switchTab(tab) {
+    document.getElementById('v-activity').classList.toggle('active', tab==='activity');
+    document.getElementById('v-stats').classList.toggle('active', tab==='stats');
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active',
+        (tab==='activity' && el.textContent==='Activity') ||
+        (tab==='stats' && el.textContent==='Stats')
+      );
+    });
+    if (tab === 'stats') updateNotifLabel();
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && currentUser) { ensureToday(); renderActivity(); renderStats(); updateDate(); }
+  });
+
+  document.getElementById('auth-pin').addEventListener('keydown', e => { if (e.key==='Enter') authSubmit(); });
+  document.getElementById('auth-username').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('auth-pin').focus(); });
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/habits/sw.js').catch(err => {
+      console.warn('Service worker registration failed:', err);
+    });
+  }
+
+  tryAutoLogin();
+</script>
+</body>
+</html>
+  .row-label { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; }
+  .habit-row.done .row-label { color: #2a2a2a; }
+  .habit-row:not(.done) .row-label { color: #fff; }
+  .muted-label { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: #222; user-select: none; }
+  .dim-label { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: #2a2a2a; user-select: none; }
+
+  .pencil { font-size: 16px; color: #2a2a2a; cursor: pointer; padding: 10px 0 10px 14px; flex-shrink: 0; line-height: 1; }
+  .pencil:active { color: #888; }
+  .habit-tick { font-size: 18px; flex-shrink: 0; margin-left: 10px; cursor: pointer; line-height: 1; }
+  .habit-row.done .habit-tick { color: #2a2a2a; }
+  .habit-row:not(.done) .habit-tick { color: #1e1e1e; }
+
+  .stat-row .row-label { max-width: 55%; color: #fff; cursor: default; }
+  .stat-val { font-size: 18px; font-weight: 600; color: #888; white-space: nowrap; line-height: 1.2; }
+  .stat-val em { color: #444; font-style: normal; }
+
+  .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; outline: none; padding: 0; min-width: 0; line-height: 1.2; }
+  .edit-ok { font-size: 15px; color: #555; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 8px 0 8px 10px; flex-shrink: 0; }
+  .edit-ok:active { color: #fff; }
+  .edit-del { font-size: 15px; color: #3a1a1a; cursor: pointer; font-family: var(--font); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 8px 0 8px 10px; flex-shrink: 0; }
+  .edit-del:active { color: #c00; }
+
+  .auth-wrap { flex: 1; display: flex; flex-direction: column; padding: 0 var(--side-pad); }
+  .auth-field { display: flex; flex-direction: column; margin-top: 20px; }
+  .auth-label { font-size: 11px; font-weight: 500; color: #444; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px; }
+  .auth-input { background: none; border: none; border-bottom: 0.5px solid #333; color: #fff; font-family: var(--font); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; outline: none; padding: 8px 0; width: 100%; line-height: 1.2; }
+  .auth-input::placeholder { color: #2a2a2a; }
+  .auth-btn { margin-top: 32px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #fff; cursor: pointer; user-select: none; background: none; border: none; font-family: var(--font); padding: 0; text-align: left; line-height: 1.2; }
+  .auth-btn:active { color: #555; }
+  .auth-switch { margin-top: 24px; font-size: 14px; color: #333; cursor: pointer; user-select: none; }
+  .auth-switch:active { color: #666; }
+  .auth-error { margin-top: 16px; font-size: 13px; color: #633; letter-spacing: 0.02em; min-height: 18px; }
+
+  .home-bar { height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .home-indicator { width: 134px; height: 5px; background: #333; border-radius: 3px; }
+
+  #export-card { position: fixed; left: -9999px; top: 0; width: 750px; background: #000; padding: 80px 60px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  #export-card .ex-year { font-size: 22px; font-weight: 500; color: #444; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 48px; }
+  #export-card .ex-row { display: flex; justify-content: space-between; align-items: baseline; padding: 28px 0; border-bottom: 0.5px solid #1a1a1a; }
+  #export-card .ex-row:last-child { border-bottom: none; }
+  #export-card .ex-name { font-size: 48px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  #export-card .ex-val { font-size: 28px; font-weight: 600; color: #888; }
+  #export-card .ex-pct { color: #444; }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 1.5px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; margin-left: 10px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="status-bar">
+    <span class="status-date" id="top-date"></span>
+    <span class="status-icons">▲▲▲</span>
+  </div>
+
+  <div class="view active" id="v-auth">
+    <div class="auth-wrap">
+      <div class="row nav-row" style="border-color:#1c1c1c;">
+        <span class="nav-item active" id="auth-title">Sign in</span>
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">Username</div>
+        <input class="auth-input" id="auth-username" type="text" placeholder="your name" autocomplete="off" autocorrect="off" autocapitalize="words" maxlength="24">
+      </div>
+      <div class="auth-field">
+        <div class="auth-label">PIN</div>
+        <input class="auth-input" id="auth-pin" type="password" inputmode="numeric" placeholder="····" maxlength="8">
+      </div>
+      <div class="auth-error" id="auth-error"></div>
+      <button class="auth-btn" id="auth-submit-btn" onclick="authSubmit()">Continue →</button>
+      <div class="auth-switch" id="auth-switch-btn" onclick="toggleAuthMode()">No account? Register</div>
+    </div>
+  </div>
+
+  <div class="content" id="main-content" style="display:none; flex-direction:column;">
+    <div class="view active" id="v-activity">
+      <div class="row nav-row">
+        <span class="nav-item active" onclick="switchTab('activity')">Activity</span>
+        <span class="nav-item" onclick="switchTab('stats')">Stats</span>
+      </div>
+      <div id="act-list"></div>
+    </div>
+    <div class="view" id="v-stats">
+      <div class="row nav-row">
+        <span class="nav-item" onclick="switchTab('activity')">Activity</span>
+        <span class="nav-item active" onclick="switchTab('stats')">Stats</span>
+      </div>
+      <div id="stat-list"></div>
+      <div class="row notif-row" id="notif-row" onclick="toggleNotifications()">
+        <span class="dim-label" id="notif-label">Enable notifications</span>
+      </div>
+      <div class="row export-row" onclick="exportStats()">
+        <span class="dim-label">↓ Save as image</span>
+      </div>
+      <div class="row logout-row" onclick="logout()">
+        <span class="muted-label">Sign out</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-bar"><div class="home-indicator"></div></div>
+</div>
+
+<div id="export-card"></div>
+
+<script>
+  const SUPA_URL = 'https://lltsprypxkctvpxebdsw.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdHNwcnlweGtjdHZweGViZHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNzg1MzAsImV4cCI6MjA5Mzc1NDUzMH0.REHs6X7F5xKMVX8OEYZ9dHpvHw1G4XjXTGO1DtE_dMg';
+  const VAPID_PUBLIC = 'BBgyykJorT9aXwkxOhZjDVx5fiYS-Lqo52ssU0A7sm3ua1BDr4D4TEJudxwfcRDufcz6C4G1hbE0XdnEwQT3RrY';
+  const DEFAULT_NAMES = ['Gym', 'Nights out', 'Family', 'Abroad', 'Reading'];
+  const MAX_HABITS = 10;
+  const MIN_HABITS = 1;
+  const SESSION_KEY = 'activity_session_v2';
+
+  let currentUser = null;
+  let habitNames = [];
+  let log = {};
+  let joinedDate = null;
+  let editingIdx = null;
+  let authMode = 'login';
+
+  // ── Date display ──────────────────────────────────────────────────
+
+  function updateDate() {
+    const n = new Date();
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     document.getElementById('top-date').textContent =
