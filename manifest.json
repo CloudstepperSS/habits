@@ -1,0 +1,16 @@
+{
+  "name": "Activity",
+  "short_name": "Activity",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "start_url": "/habits/",
+  "icons": [
+    {
+      "src": "/habits/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
