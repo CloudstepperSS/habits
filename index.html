@@ -421,7 +421,7 @@
     showView('v-main');
     document.getElementById('v-activity').classList.add('active');
     document.getElementById('v-progress').classList.remove('active');
-    updateDate();updateNotifLabel();renderDayHeader();renderActivity();renderStats();
+    updateDate();updateNotifLabel();renderDayHeader();renderActivity();renderStats();setTimeout(fixListHeight,100);
   }
 
   function logout(){
@@ -799,6 +799,18 @@
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/habits/sw.js').catch(err=>console.warn('SW:',err));
   }
+
+  function fixListHeight() {
+    const lists = document.querySelectorAll('.habit-list, .stat-list');
+    lists.forEach(list => {
+      const rect = list.getBoundingClientRect();
+      const available = window.innerHeight - rect.top - 20;
+      list.style.maxHeight = available + 'px';
+    });
+  }
+  window.addEventListener('resize', fixListHeight);
+  window.addEventListener('orientationchange', fixListHeight);
+  setTimeout(fixListHeight, 300);
 
   tryAutoLogin();
 </script>
