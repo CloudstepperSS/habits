@@ -31,6 +31,7 @@
   .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
   .view { display: none; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+  #v-activity, #v-progress { overflow: hidden; }
   .view.active { display: flex; }
 
   .nav-row { display: flex; justify-content: space-between; align-items: center; height: var(--nav-h); padding: 0 var(--side-pad); border-bottom: 0.5px solid #1c1c1c; flex-shrink: 0; }
@@ -42,7 +43,7 @@
   .day-col-hdr { width: var(--col-w); text-align: center; font-size: var(--font-tiny); color: #555; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
   .day-col-hdr.today-col { color: #888; }
 
-  .habit-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 20px; }
+  .habit-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 20px; min-height: 0; }
   .habit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; }
   .habit-row:last-child { border-bottom: none; }
   .habit-name { flex: 1; font-size: var(--font-main); font-weight: 600; letter-spacing: -0.01em; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -470,16 +471,16 @@
     const reg=await navigator.serviceWorker.getRegistration();    const sub=reg?await reg.pushManager.getSubscription():null;
     const el=document.getElementById('notif-label');
     if(Notification.permission==='denied'){
-      el.textContent='Notifications blocked';row.style.pointerEvents='none';timeRow.classList.remove('visible');
+      el.textContent='Notifications blocked';row.style.pointerEvents='none';timeRow.style.display='none';
     }else if(sub){
-      el.textContent='Disable notifications';timeRow.classList.add('visible');
+      el.textContent='Disable notifications';timeRow.style.display='flex';
       if(!timeSelect || timeSelect.options.length===0){
         if(timeSelect) for(let h=0;h<24;h++){const ampm=h<12?'AM':'PM';const label=(h===0?12:h>12?h-12:h)+':00 '+ampm;const opt=document.createElement('option');opt.value=h;opt.textContent=label;timeSelect.appendChild(opt);}
       }
       const res=await fetch(SUPA_URL+'/rest/v1/push_subscriptions?username=eq.'+encodeURIComponent(currentUser)+'&select=notif_hour',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
       const rows=await res.json();timeSelect.value=rows[0]?.notif_hour??21;
     }else{
-      el.textContent='Enable notifications';timeRow.classList.remove('visible');
+      el.textContent='Enable notifications';timeRow.style.display='none';
     }
   }
 
