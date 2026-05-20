@@ -14,14 +14,14 @@
   :root {
     --side-pad: 5vw;
     --font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    --row-h: 8vh;
-    --col-w: 11vw;
-    --box-size: 4.8vw;
-    --font-main: 4.2vw;
+    --row-h: 6.5vh;
+    --col-w: 10vw;
+    --box-size: 4vw;
+    --font-main: 3.8vw;
     --font-small: 3.2vw;
     --font-tiny: 2.4vw;
-    --nav-h: 7vh;
-    --bottom-row-h: 5.5vh;
+    --nav-h: 6vh;
+    --bottom-row-h: 5vh;
   }
   html, body { width: 100%; height: 100%; background: #000; color: #fff; font-family: var(--font); overflow: hidden; }
   .app { display: flex; flex-direction: column; width: 100%; height: 100%; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); background: #000; }
@@ -43,7 +43,7 @@
   .day-col-hdr { width: var(--col-w); text-align: center; font-size: var(--font-tiny); color: #555; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
   .day-col-hdr.today-col { color: #888; }
 
-  .habit-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 20px; min-height: 0; }
+  .habit-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
   .habit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; }
   .habit-row:last-child { border-bottom: none; }
   .habit-name { flex: 1; font-size: var(--font-main); font-weight: 600; letter-spacing: -0.01em; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -421,7 +421,7 @@
     showView('v-main');
     document.getElementById('v-activity').classList.add('active');
     document.getElementById('v-progress').classList.remove('active');
-    updateDate();updateNotifLabel();renderDayHeader();renderActivity();renderStats();setTimeout(fixListHeight,100);
+    updateDate();updateNotifLabel();renderDayHeader();renderActivity();renderStats();
   }
 
   function logout(){
@@ -799,18 +799,6 @@
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/habits/sw.js').catch(err=>console.warn('SW:',err));
   }
-
-  function fixListHeight() {
-    const lists = document.querySelectorAll('.habit-list, .stat-list');
-    lists.forEach(list => {
-      const rect = list.getBoundingClientRect();
-      const available = window.innerHeight - rect.top - 20;
-      list.style.maxHeight = available + 'px';
-    });
-  }
-  window.addEventListener('resize', fixListHeight);
-  window.addEventListener('orientationchange', fixListHeight);
-  setTimeout(fixListHeight, 300);
 
   tryAutoLogin();
 </script>
