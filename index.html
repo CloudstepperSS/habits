@@ -16,8 +16,9 @@
     --side-pad: 5vw;
     --font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     --row-h: 7vh;
-    --col-w: 11vw;
-    --box-size: max(4.8vw, 3.2vh);
+    --col-w: 9vw;
+    --trend-col-w: 8vw;
+    --box-size: max(4vw, 2.7vh);
     --font-main: max(4.2vw, 2.4vh);
     --font-small: max(3.4vw, 1.9vh);
     --font-tiny: max(2.6vw, 1.5vh);
@@ -43,6 +44,7 @@
   .day-header-spacer { flex: 1; }
   .day-col-hdr { width: var(--col-w); text-align: center; font-size: var(--font-tiny); color: #555; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
   .day-col-hdr.today-col { color: #888; }
+  .day-col-hdr.trend-col-hdr { width: var(--trend-col-w); }
 
   .habit-list { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
   .habit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; }
@@ -55,6 +57,8 @@
   .day-box.on { background: #888; border-color: #888; }
   .day-box.today-box { border-color: #aaa; }
   .day-box.today-box.on { background: #999; border-color: #999; }
+  .trend-cell { width: var(--trend-col-w); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .trend-arrow { display: inline-block; font-size: var(--font-small); font-weight: 700; line-height: 1; transition: transform 0.2s ease; }
 
   .edit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; gap: 2vw; }
   .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: var(--font-main); font-weight: 600; letter-spacing: -0.01em; outline: none; padding: 0; min-width: 0; }
@@ -122,16 +126,10 @@
   .spinner { display: inline-block; width: 3vw; height: 3vw; border: 1.5px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; margin-left: 2vw; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .rotate-overlay { display: none; position: fixed; inset: 0; width: 100%; height: 100%; background: #000; z-index: 9999; align-items: center; justify-content: center; text-align: center; padding: 0 8vw; }
+  .rotate-overlay-text { font-size: 5vmin; font-weight: 600; color: #555; letter-spacing: 0.06em; text-transform: uppercase; }
   @media screen and (orientation: landscape) {
-    .app {
-      transform: rotate(-90deg);
-      transform-origin: left top;
-      width: 100vh;
-      height: 100vw;
-      position: fixed;
-      top: 100%;
-      left: 0;
-    }
+    .rotate-overlay { display: flex; }
   }
 </style>
 </head>
@@ -238,7 +236,9 @@
 </div>
 <div id="settings-overlay" onclick="closeSettings()" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:998;"></div>
 <div id="export-card"></div>
-  <div style="font-size:4vw;font-weight:600;color:#555;letter-spacing:0.06em;text-transform:uppercase;">Rotate to portrait</div>
+
+<div class="rotate-overlay" id="rotate-overlay">
+  <div class="rotate-overlay-text">Rotate to portrait</div>
 </div>
 
 <script>
@@ -455,6 +455,21 @@
     return Object.entries(log).filter(([k,e])=>Array.isArray(e)&&e[idx]===true&&k>=sd).length;
   }
 
+  function twoWeekTrend(idx){
+    // Fraction of the last 14 days (or fewer, if the activity is newer) that were logged
+    const sd=startDates[idx];
+    let hit=0,total=0;
+    for(let i=0;i<14;i++){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const k=dateStr(d);
+      if(sd&&k<sd)continue;
+      total++;
+      if(log[k]&&log[k][idx]===true)hit++;
+    }
+    if(total===0)return null;
+    return hit/total;
+  }
+
   async function persist(){
     if(!userEmail)return;
     await sbUpdate(userEmail,{habit_names:habitNames,start_dates:startDates,log});
@@ -520,6 +535,10 @@
       col.className='day-col-hdr'+(dateStr(d)===todayK?' today-col':'');
       col.textContent=days[d.getDay()];header.appendChild(col);
     });
+    const trendCol=document.createElement('div');
+    trendCol.className='day-col-hdr trend-col-hdr';
+    trendCol.textContent='2W';
+    header.appendChild(trendCol);
   }
 
   let dragSrcIdx = null;
@@ -613,6 +632,21 @@
         }
         row.appendChild(cell);
       });
+
+      // Trend arrow: points up the more consistent the last 14 days were, down the less
+      const trendCell=document.createElement('div');trendCell.className='trend-cell';
+      const arrow=document.createElement('span');arrow.className='trend-arrow';
+      const frac=twoWeekTrend(i);
+      if(frac===null){
+        arrow.textContent='–';
+        arrow.style.color='#333';
+      }else{
+        arrow.textContent='↑';
+        arrow.style.transform='rotate('+((1-frac)*180)+'deg)';
+        arrow.style.color=frac>=0.5?'#888':'#555';
+      }
+      trendCell.appendChild(arrow);
+      row.appendChild(trendCell);
 
       row.insertBefore(handle,row.firstChild);
       row.insertBefore(nameEl,row.children[1]);
