@@ -58,7 +58,7 @@
   .day-box.today-box { border-color: #aaa; }
   .day-box.today-box.on { background: #999; border-color: #999; }
   .trend-cell { width: var(--trend-col-w); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .trend-arrow { display: inline-block; font-size: var(--font-small); font-weight: 700; line-height: 1; }
+  .trend-arrow { display: inline-block; font-size: var(--font-small); font-weight: 700; line-height: 1; transition: transform 0.2s ease; }
 
   .edit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; gap: 2vw; }
   .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: var(--font-main); font-weight: 600; letter-spacing: -0.01em; outline: none; padding: 0; min-width: 0; }
@@ -642,22 +642,22 @@
         row.appendChild(cell);
       });
 
-      // Trend arrow: last 14 days vs. all-time average. ↗ above average, ↘ below, ↑ right on it
+      // Trend arrow: last 14 days vs. all-time average. Up-right if above average, down-right if below, straight up if right on it
       const trendCell=document.createElement('div');trendCell.className='trend-cell';
       const arrow=document.createElement('span');arrow.className='trend-arrow';
       const diff=twoWeekTrend(i); // -1..1, or null if not enough history yet
       const TREND_THRESHOLD=0.03; // within ~3 percentage points counts as "on average"
+      arrow.textContent=diff===null?'–':'↑';
       if(diff===null){
-        arrow.textContent='–';
         arrow.style.color='#333';
       }else if(diff>TREND_THRESHOLD){
-        arrow.textContent='↗';
+        arrow.style.transform='rotate(45deg)';
         arrow.style.color='#888';
       }else if(diff<-TREND_THRESHOLD){
-        arrow.textContent='↘';
+        arrow.style.transform='rotate(135deg)';
         arrow.style.color='#555';
       }else{
-        arrow.textContent='↑';
+        arrow.style.transform='rotate(0deg)';
         arrow.style.color='#666';
       }
       trendCell.appendChild(arrow);
