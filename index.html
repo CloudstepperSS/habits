@@ -456,18 +456,37 @@
   }
 
   function twoWeekTrend(idx){
-    // Fraction of the last 14 days (or fewer, if the activity is newer) that were logged
+    // Compares the completion rate of the last 14 days against the rate for
+    // everything before that (from the activity's start date up to 14 days ago).
     const sd=startDates[idx];
-    let hit=0,total=0;
+    if(!sd)return null;
+    const today=new Date();
+
+    // Recent window: last 14 days, bounded by start date
+    let recentHit=0,recentTotal=0;
     for(let i=0;i<14;i++){
-      const d=new Date();d.setDate(d.getDate()-i);
+      const d=new Date(today);d.setDate(d.getDate()-i);
       const k=dateStr(d);
-      if(sd&&k<sd)continue;
-      total++;
-      if(log[k]&&log[k][idx]===true)hit++;
+      if(k<sd)continue;
+      recentTotal++;
+      if(log[k]&&log[k][idx]===true)recentHit++;
     }
-    if(total===0)return null;
-    return hit/total;
+    if(recentTotal===0)return null;
+    const recentFrac=recentHit/recentTotal;
+
+    // Prior window: start date up to (but not including) the recent window
+    const recentStart=new Date(today);recentStart.setDate(recentStart.getDate()-(recentTotal-1));
+    const recentStartStr=dateStr(recentStart);
+    let priorHit=0,priorTotal=0;
+    for(let d=new Date(sd+'T00:00:00');dateStr(d)<recentStartStr;d.setDate(d.getDate()+1)){
+      priorTotal++;
+      const k=dateStr(d);
+      if(log[k]&&log[k][idx]===true)priorHit++;
+    }
+    if(priorTotal===0)return null; // not enough history yet to compare against
+    const priorFrac=priorHit/priorTotal;
+
+    return recentFrac-priorFrac; // -1 (fell off completely) .. 0 (steady) .. 1 (much better)
   }
 
   async function persist(){
@@ -633,17 +652,17 @@
         row.appendChild(cell);
       });
 
-      // Trend arrow: points up the more consistent the last 14 days were, down the less
+      // Trend arrow: points up if the last 14 days beat your prior average, down if it's worse
       const trendCell=document.createElement('div');trendCell.className='trend-cell';
       const arrow=document.createElement('span');arrow.className='trend-arrow';
-      const frac=twoWeekTrend(i);
-      if(frac===null){
+      const diff=twoWeekTrend(i); // -1..1, or null if not enough history yet
+      if(diff===null){
         arrow.textContent='–';
         arrow.style.color='#333';
       }else{
         arrow.textContent='↑';
-        arrow.style.transform='rotate('+((1-frac)*180)+'deg)';
-        arrow.style.color=frac>=0.5?'#888':'#555';
+        arrow.style.transform='rotate('+((0-diff)*90+90)+'deg)';
+        arrow.style.color=diff>0?'#888':diff<0?'#555':'#666';
       }
       trendCell.appendChild(arrow);
       row.appendChild(trendCell);
