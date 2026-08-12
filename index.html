@@ -58,7 +58,7 @@
   .day-box.today-box { border-color: #aaa; }
   .day-box.today-box.on { background: #999; border-color: #999; }
   .trend-cell { width: var(--trend-col-w); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .trend-arrow { display: inline-block; font-size: var(--font-small); font-weight: 700; line-height: 1; transition: transform 0.2s ease; }
+  .trend-arrow { display: inline-block; font-size: var(--font-small); font-weight: 700; line-height: 1; }
 
   .edit-row { display: flex; align-items: center; padding: 0 var(--side-pad); height: var(--row-h); border-bottom: 0.5px solid #111; flex-shrink: 0; gap: 2vw; }
   .edit-input { flex: 1; background: none; border: none; border-bottom: 0.5px solid #555; color: #fff; font-family: var(--font); font-size: var(--font-main); font-weight: 600; letter-spacing: -0.01em; outline: none; padding: 0; min-width: 0; }
@@ -456,13 +456,14 @@
   }
 
   function twoWeekTrend(idx){
-    // Compares the completion rate of the last 14 days against the rate for
-    // everything before that (from the activity's start date up to 14 days ago).
+    // Compares the completion rate of the last 14 days against the all-time rate
+    // (since the activity's start date, inclusive of the recent window).
     const sd=startDates[idx];
     if(!sd)return null;
+    const elapsed=daysSince(sd);
+    if(elapsed<1)return null;
     const today=new Date();
 
-    // Recent window: last 14 days, bounded by start date
     let recentHit=0,recentTotal=0;
     for(let i=0;i<14;i++){
       const d=new Date(today);d.setDate(d.getDate()-i);
@@ -473,20 +474,9 @@
     }
     if(recentTotal===0)return null;
     const recentFrac=recentHit/recentTotal;
+    const allTimeFrac=totalDaysSince(idx)/elapsed;
 
-    // Prior window: start date up to (but not including) the recent window
-    const recentStart=new Date(today);recentStart.setDate(recentStart.getDate()-(recentTotal-1));
-    const recentStartStr=dateStr(recentStart);
-    let priorHit=0,priorTotal=0;
-    for(let d=new Date(sd+'T00:00:00');dateStr(d)<recentStartStr;d.setDate(d.getDate()+1)){
-      priorTotal++;
-      const k=dateStr(d);
-      if(log[k]&&log[k][idx]===true)priorHit++;
-    }
-    if(priorTotal===0)return null; // not enough history yet to compare against
-    const priorFrac=priorHit/priorTotal;
-
-    return recentFrac-priorFrac; // -1 (fell off completely) .. 0 (steady) .. 1 (much better)
+    return recentFrac-allTimeFrac; // -1 (well below your average) .. 0 (right on average) .. 1 (well above)
   }
 
   async function persist(){
@@ -652,17 +642,23 @@
         row.appendChild(cell);
       });
 
-      // Trend arrow: points up if the last 14 days beat your prior average, down if it's worse
+      // Trend arrow: last 14 days vs. all-time average. ↗ above average, ↘ below, ↑ right on it
       const trendCell=document.createElement('div');trendCell.className='trend-cell';
       const arrow=document.createElement('span');arrow.className='trend-arrow';
       const diff=twoWeekTrend(i); // -1..1, or null if not enough history yet
+      const TREND_THRESHOLD=0.03; // within ~3 percentage points counts as "on average"
       if(diff===null){
         arrow.textContent='–';
         arrow.style.color='#333';
+      }else if(diff>TREND_THRESHOLD){
+        arrow.textContent='↗';
+        arrow.style.color='#888';
+      }else if(diff<-TREND_THRESHOLD){
+        arrow.textContent='↘';
+        arrow.style.color='#555';
       }else{
         arrow.textContent='↑';
-        arrow.style.transform='rotate('+((0-diff)*90+90)+'deg)';
-        arrow.style.color=diff>0?'#888':diff<0?'#555':'#666';
+        arrow.style.color='#666';
       }
       trendCell.appendChild(arrow);
       row.appendChild(trendCell);
