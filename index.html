@@ -126,10 +126,23 @@
   .spinner { display: inline-block; width: 3vw; height: 3vw; border: 1.5px solid #333; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; margin-left: 2vw; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .rotate-overlay { display: none; position: fixed; inset: 0; width: 100%; height: 100%; background: #000; z-index: 9999; align-items: center; justify-content: center; text-align: center; padding: 0 8vw; }
-  .rotate-overlay-text { font-size: 5vmin; font-weight: 600; color: #555; letter-spacing: 0.06em; text-transform: uppercase; }
+  /* Landscape: swap which viewport axis drives sizing so text, rows, and
+     columns scale by the (now short) height instead of the (now long) width,
+     keeping roughly the same absolute pixel sizes as portrait. */
   @media screen and (orientation: landscape) {
-    .rotate-overlay { display: flex; }
+    :root {
+      --side-pad: 5vh;
+      --row-h: 7vw;
+      --col-w: 9vh;
+      --trend-col-w: 8vh;
+      --box-size: max(4vh, 2.7vw);
+      --font-main: max(4.2vh, 2.4vw);
+      --font-small: max(3.4vh, 1.9vw);
+      --font-tiny: max(2.6vh, 1.5vw);
+      --nav-h: 6.5vw;
+      --bottom-row-h: 5.5vw;
+    }
+    #settings-panel { width: 70vh !important; }
   }
 </style>
 </head>
@@ -236,10 +249,6 @@
 </div>
 <div id="settings-overlay" onclick="closeSettings()" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:998;"></div>
 <div id="export-card"></div>
-
-<div class="rotate-overlay" id="rotate-overlay">
-  <div class="rotate-overlay-text">Rotate to portrait</div>
-</div>
 
 <script>
   const SUPA_URL='https://lltsprypxkctvpxebdsw.supabase.co';
@@ -461,7 +470,6 @@
     const sd=startDates[idx];
     if(!sd)return null;
     const elapsed=daysSince(sd);
-    if(elapsed<1)return null;
     const today=new Date();
 
     let recentHit=0,recentTotal=0;
@@ -473,6 +481,7 @@
       if(log[k]&&log[k][idx]===true)recentHit++;
     }
     if(recentTotal===0)return null;
+    if(recentTotal>=elapsed)return null; // whole history falls inside the recent window — nothing to compare against yet
     const recentFrac=recentHit/recentTotal;
     const allTimeFrac=totalDaysSince(idx)/elapsed;
 
@@ -642,7 +651,7 @@
         row.appendChild(cell);
       });
 
-      // Trend arrow: last 14 days vs. all-time average. Up-right if above average, down-right if below, straight up if right on it
+      // Trend arrow: last 14 days vs. all-time average. Up-right if above average, down-right if below, right if on average
       const trendCell=document.createElement('div');trendCell.className='trend-cell';
       const arrow=document.createElement('span');arrow.className='trend-arrow';
       const diff=twoWeekTrend(i); // -1..1, or null if not enough history yet
@@ -657,7 +666,7 @@
         arrow.style.transform='rotate(135deg)';
         arrow.style.color='#555';
       }else{
-        arrow.style.transform='rotate(0deg)';
+        arrow.style.transform='rotate(90deg)';
         arrow.style.color='#666';
       }
       trendCell.appendChild(arrow);
