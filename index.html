@@ -243,6 +243,17 @@
   <div onclick="exportStats()" style="display:flex;align-items:center;padding:0 5vw;height:var(--bottom-row-h);border-bottom:0.5px solid #111;cursor:pointer;">
     <span style="font-size:var(--font-small);font-weight:600;color:#888;">↓ Save as image</span>
   </div>
+  <div id="settings-pin-row" onclick="openChangePin()" style="display:flex;align-items:center;padding:0 5vw;height:var(--bottom-row-h);border-bottom:0.5px solid #111;cursor:pointer;">
+    <span style="font-size:var(--font-small);font-weight:600;color:#888;">Change PIN</span>
+  </div>
+  <div id="change-pin-panel" style="display:none;flex-direction:column;padding:2vh 5vw;border-bottom:0.5px solid #111;">
+    <input class="auth-input" id="cp-current" type="password" inputmode="numeric" placeholder="current PIN" maxlength="8" style="margin-bottom:1.5vh;">
+    <input class="auth-input" id="cp-new" type="password" inputmode="numeric" placeholder="new PIN" maxlength="8" style="margin-bottom:1.5vh;">
+    <input class="auth-input" id="cp-confirm" type="password" inputmode="numeric" placeholder="confirm new PIN" maxlength="8" style="margin-bottom:1.5vh;">
+    <div id="cp-error" style="font-size:var(--font-tiny);font-weight:600;color:#a33;min-height:2vh;margin-bottom:1vh;"></div>
+    <button class="auth-btn" id="cp-btn" onclick="submitChangePin()">Update PIN →</button>
+    <span onclick="closeChangePin()" style="font-size:var(--font-tiny);font-weight:600;color:#555;margin-top:1.5vh;cursor:pointer;">Cancel</span>
+  </div>
   <div onclick="logout()" style="display:flex;align-items:center;padding:0 5vw;height:var(--bottom-row-h);cursor:pointer;">
     <span style="font-size:var(--font-small);font-weight:600;color:#555;">Sign out</span>
   </div>
@@ -349,6 +360,42 @@
       errEl.style.color='#557';
       errEl.textContent='PIN updated! Signing you in...';
       setTimeout(()=>{saveSession(user.email,tok);loginAs(user);},1000);
+    }catch(e){
+      errEl.textContent=e.message;btn.textContent='Update PIN →';
+    }
+  }
+
+  // ── Change PIN ────────────────────────────────────────────────────
+  function openChangePin(){
+    ['cp-current','cp-new','cp-confirm'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cp-error').textContent='';
+    document.getElementById('cp-btn').textContent='Update PIN →';
+    document.getElementById('change-pin-panel').style.display='flex';
+    document.getElementById('settings-pin-row').style.display='none';
+  }
+  function closeChangePin(){
+    document.getElementById('change-pin-panel').style.display='none';
+    document.getElementById('settings-pin-row').style.display='flex';
+  }
+  async function submitChangePin(){
+    const currentPin=document.getElementById('cp-current').value.trim();
+    const newPin=document.getElementById('cp-new').value.trim();
+    const confirmPin=document.getElementById('cp-confirm').value.trim();
+    const errEl=document.getElementById('cp-error');
+    const btn=document.getElementById('cp-btn');
+    errEl.style.color='#a33';errEl.textContent='';
+    if(!currentPin){errEl.textContent='Enter your current PIN.';return;}
+    if(!newPin||newPin.length<4){errEl.textContent='New PIN must be at least 4 digits.';return;}
+    if(newPin!==confirmPin){errEl.textContent='New PINs do not match.';return;}
+    if(newPin===currentPin){errEl.textContent='New PIN must be different.';return;}
+    btn.innerHTML='Updating <span class="spinner"></span>';
+    try{
+      const{token}=await callFn('auth-change-pin',{email:userEmail,token:sessionToken,currentPin,newPin});
+      sessionToken=token;saveSession(userEmail,token);
+      errEl.style.color='#557';
+      errEl.textContent='PIN updated. Other devices signed out.';
+      btn.textContent='Update PIN →';
+      setTimeout(()=>closeChangePin(),1800);
     }catch(e){
       errEl.textContent=e.message;btn.textContent='Update PIN →';
     }
@@ -822,6 +869,7 @@
   }
   function closeSettings(){
     document.getElementById('settings-panel').style.display='none';
+    closeChangePin();
     document.getElementById('settings-overlay').style.display='none';
   }
 
