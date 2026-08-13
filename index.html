@@ -254,8 +254,23 @@
   const SUPA_URL='https://lltsprypxkctvpxebdsw.supabase.co';
   const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdHNwcnlweGtjdHZweGViZHN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNzg1MzAsImV4cCI6MjA5Mzc1NDUzMH0.REHs6X7F5xKMVX8OEYZ9dHpvHw1G4XjXTGO1DtE_dMg';
   const VAPID_PUBLIC='BBgyykJorT9aXwkxOhZjDVx5fiYS-Lqo52ssU0A7sm3ua1BDr4D4TEJudxwfcRDufcz6C4G1hbE0XdnEwQT3RrY';
-  const MAX_HABITS=10,MIN_HABITS=1,SESSION_KEY='activity_session_v3',DAYS_BACK=3;
-  let currentUser=null,userEmail=null,habitNames=[],startDates=[],log={},joinedDate=null,editingIdx=null,authMode='login';
+  const MAX_HABITS=10,MIN_HABITS=1,SESSION_KEY='activity_session_v4',DAYS_BACK=3;
+  let currentUser=null,userEmail=null,sessionToken=null,habitNames=[],startDates=[],log={},joinedDate=null,editingIdx=null,authMode='login';
+
+  // ── Edge Functions ───────────────────────────────────────────────
+  // Every request now goes through a server-side function (using Supabase's
+  // service-role key, never exposed to the browser) instead of hitting the
+  // users/push_subscriptions tables directly with the public anon key.
+  async function callFn(name,body){
+    const res=await fetch(SUPA_URL+'/functions/v1/'+name,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||'Request failed.');
+    return data;
+  }
 
   // ── Dates ─────────────────────────────────────────────────────────
   function dateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -301,26 +316,7 @@
     return d+' '+months[m-1]+' '+y;
   }
 
-  // ── Hashing ───────────────────────────────────────────────────────
-  async function hashPin(pin){
-    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pin));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  }
-
-  // ── Supabase ──────────────────────────────────────────────────────
-  async function sbGetByEmail(email){
-    const res=await fetch(SUPA_URL+'/rest/v1/users?email=eq.'+encodeURIComponent(email.toLowerCase())+'&select=*',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    return(await res.json())[0]||null;
-  }
-  async function sbInsert(email,hashedPin){
-    const res=await fetch(SUPA_URL+'/rest/v1/users',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify({email:email.toLowerCase(),username:email.toLowerCase(),pin:hashedPin,habit_names:[],start_dates:[],log:{},joined_date:todayStr()})});
-    return(await res.json())[0]||null;
-  }
-  async function sbUpdate(email,data){
-    await fetch(SUPA_URL+'/rest/v1/users?email=eq.'+encodeURIComponent(email.toLowerCase()),{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(data)});
-  }
-
-  // ── Password reset (simple token system) ─────────────────────────
+  // ── Password reset ────────────────────────────────────────────────
   async function requestReset(){
     const email=document.getElementById('reset-email').value.trim().toLowerCase();
     const errEl=document.getElementById('reset-error');
@@ -328,23 +324,15 @@
     errEl.textContent='';
     if(!email){errEl.textContent='Please enter your email.';return;}
     btn.innerHTML='Sending <span class="spinner"></span>';
-    const user=await sbGetByEmail(email);
-    if(!user){errEl.textContent='No account found with that email.';btn.textContent='Send reset email →';return;}
-    // Generate a simple reset token and store it with expiry
-    const token=Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
-    const expiry=new Date(Date.now()+3600000).toISOString(); // 1 hour
-    await sbUpdate(email,{reset_token:token,reset_expiry:expiry});
-    // Send email via Supabase Edge Function
-    await fetch(SUPA_URL+'/functions/v1/send-reset-email',{
-      method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email,token})
-    });
-    errEl.style.color='#557';
-    errEl.textContent='Reset email sent. Check your inbox.';
-    btn.textContent='Send reset email →';
-    // Show token input after a moment
-    setTimeout(()=>showResetConfirm(),1500);
+    try{
+      await callFn('auth-reset-request',{email});
+      errEl.style.color='#557';
+      errEl.textContent='If that email has an account, a reset link is on its way.';
+      btn.textContent='Send reset email →';
+      setTimeout(()=>showResetConfirm(),1500);
+    }catch(e){
+      errEl.textContent=e.message;btn.textContent='Send reset email →';
+    }
   }
 
   async function confirmReset(){
@@ -356,21 +344,19 @@
     if(!token){errEl.textContent='Please paste your reset token.';return;}
     if(!newPin||newPin.length<4){errEl.textContent='PIN must be at least 4 digits.';return;}
     btn.innerHTML='Updating <span class="spinner"></span>';
-    // Find user with this token
-    const res=await fetch(SUPA_URL+'/rest/v1/users?reset_token=eq.'+encodeURIComponent(token)+'&select=*',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-    const rows=await res.json();
-    const user=rows[0];
-    if(!user){errEl.textContent='Invalid token.';btn.textContent='Update PIN →';return;}
-    if(new Date(user.reset_expiry)<new Date()){errEl.textContent='Token expired. Request a new one.';btn.textContent='Update PIN →';return;}
-    const hashedPin=await hashPin(newPin);
-    await sbUpdate(user.email,{pin:hashedPin,reset_token:null,reset_expiry:null});
-    errEl.style.color='#557';
-    errEl.textContent='PIN updated! Signing you in...';
-    setTimeout(()=>{saveSession(user.email,hashedPin);loginAs({...user,pin:hashedPin});},1000);
+    try{
+      const{token:tok,user}=await callFn('auth-reset-confirm',{token,newPin});
+      errEl.style.color='#557';
+      errEl.textContent='PIN updated! Signing you in...';
+      setTimeout(()=>{saveSession(user.email,tok);loginAs(user);},1000);
+    }catch(e){
+      errEl.textContent=e.message;btn.textContent='Update PIN →';
+    }
   }
 
   // ── Session ───────────────────────────────────────────────────────
-  function saveSession(email,h){try{localStorage.setItem(SESSION_KEY,JSON.stringify({email,hashedPin:h}));}catch(e){}}
+  // Stores an opaque session token, never the PIN or its hash.
+  function saveSession(email,tok){try{localStorage.setItem(SESSION_KEY,JSON.stringify({email,token:tok}));}catch(e){}}
   function clearSession(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}}
   function loadSession(){try{const r=localStorage.getItem(SESSION_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
 
@@ -403,24 +389,19 @@
     if(!email||!email.includes('@')){errEl.textContent='Please enter a valid email.';return;}
     if(!pin||pin.length<4){errEl.textContent='PIN must be at least 4 digits.';return;}
     btn.innerHTML='Continue <span class="spinner"></span>';
-    const hashedPin=await hashPin(pin);
-    if(authMode==='register'){
-      const existing=await sbGetByEmail(email);
-      if(existing){errEl.textContent='An account with that email already exists.';btn.textContent='Continue →';return;}
-      const user=await sbInsert(email,hashedPin);
-      if(!user){errEl.textContent='Registration failed. Try again.';btn.textContent='Continue →';return;}
-      saveSession(email,hashedPin);loginAs(user);
-    }else{
-      const user=await sbGetByEmail(email);
-      if(!user){errEl.textContent='No account found with that email.';btn.textContent='Continue →';return;}
-      if(user.pin!==hashedPin){errEl.textContent='Incorrect PIN.';btn.textContent='Continue →';return;}
-      saveSession(email,hashedPin);loginAs(user);
+    try{
+      const fn=authMode==='register'?'auth-register':'auth-login';
+      const{token,user}=await callFn(fn,{email,pin});
+      saveSession(email,token);loginAs(user);
+    }catch(e){
+      errEl.textContent=e.message;btn.textContent='Continue →';
     }
   }
 
   function loginAs(user){
     currentUser=user.username||user.email;
     userEmail=user.email;
+    const s=loadSession();sessionToken=s?s.token:null;
     habitNames=user.habit_names||[];
     startDates=user.start_dates||[];
     // Backfill startDates if missing
@@ -435,7 +416,7 @@
   }
 
   function logout(){
-    clearSession();currentUser=null;userEmail=null;habitNames=[];startDates=[];log={};joinedDate=null;
+    clearSession();currentUser=null;userEmail=null;sessionToken=null;habitNames=[];startDates=[];log={};joinedDate=null;
     showAuth();
     document.getElementById('auth-email').value='';
     document.getElementById('auth-pin').value='';
@@ -445,8 +426,10 @@
 
   async function tryAutoLogin(){
     const s=loadSession();if(!s)return;
-    const user=await sbGetByEmail(s.email);
-    if(user&&user.pin===s.hashedPin)loginAs(user);else clearSession();
+    try{
+      const{user}=await callFn('auth-verify',{email:s.email,token:s.token});
+      loginAs(user);
+    }catch(e){clearSession();}
   }
 
   // ── Data ──────────────────────────────────────────────────────────
@@ -489,8 +472,10 @@
   }
 
   async function persist(){
-    if(!userEmail)return;
-    await sbUpdate(userEmail,{habit_names:habitNames,start_dates:startDates,log});
+    if(!userEmail||!sessionToken)return;
+    try{
+      await callFn('user-update',{email:userEmail,token:sessionToken,patch:{habit_names:habitNames,start_dates:startDates,log}});
+    }catch(e){console.warn('Save failed:',e.message);}
   }
 
   // ── Notifications ─────────────────────────────────────────────────
@@ -511,8 +496,10 @@
       if(!timeSelect || timeSelect.options.length===0){
         if(timeSelect) for(let h=0;h<24;h++){const ampm=h<12?'AM':'PM';const label=(h===0?12:h>12?h-12:h)+':00 '+ampm;const opt=document.createElement('option');opt.value=h;opt.textContent=label;timeSelect.appendChild(opt);}
       }
-      const res=await fetch(SUPA_URL+'/rest/v1/push_subscriptions?username=eq.'+encodeURIComponent(currentUser)+'&select=notif_hour',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
-      const rows=await res.json();timeSelect.value=rows[0]?.notif_hour??21;
+      try{
+        const{notifHour}=await callFn('push-manage',{email:userEmail,token:sessionToken,action:'get'});
+        timeSelect.value=notifHour??21;
+      }catch(e){timeSelect.value=21;}
     }else{
       el.textContent='Enable notifications';timeRow.style.display='none';
     }
@@ -525,21 +512,20 @@
     const existing=await reg.pushManager.getSubscription();
     if(existing){
       await existing.unsubscribe();
-      await fetch(SUPA_URL+'/rest/v1/push_subscriptions?username=eq.'+encodeURIComponent(currentUser),{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+      await callFn('push-manage',{email:userEmail,token:sessionToken,action:'unsubscribe'});
       await updateNotifLabel();return;
     }
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){alert('Permission denied. Enable notifications in your device settings.');return;}
     try{
       const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC)});
-      const today=todayStr();
-      await fetch(SUPA_URL+'/rest/v1/push_subscriptions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,subscription:sub.toJSON(),utc_offset:-new Date().getTimezoneOffset(),notif_hour:21,notif_start_date:today})});
+      await callFn('push-manage',{email:userEmail,token:sessionToken,action:'subscribe',subscription:sub.toJSON(),utcOffset:-new Date().getTimezoneOffset(),notifHour:21});
       await updateNotifLabel();
     }catch(e){alert('Could not enable notifications: '+e.message);}
   }
 
   async function updateNotifHour(hour){
-    await fetch(SUPA_URL+'/rest/v1/push_subscriptions?username=eq.'+encodeURIComponent(currentUser),{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({notif_hour:parseInt(hour)})});
+    await callFn('push-manage',{email:userEmail,token:sessionToken,action:'set-hour',notifHour:parseInt(hour)});
   }
 
   // ── Rendering ─────────────────────────────────────────────────────
